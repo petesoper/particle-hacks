@@ -49,7 +49,8 @@ Modified by Jose Garcia for Ubidots Inc
 #define PORT 9012
 #endif
 #ifndef MAX_VALUES
-#define MAX_VALUES 10
+// PJS changed for experiment to see if server side enforces original 10 limit
+#define MAX_VALUES 11
 #endif
 #ifndef TYPE_TCP
 #define TYPE_TCP 1
@@ -106,7 +107,7 @@ class Ubidots {
   Value * val;
   uint8_t _currentValue;
   char* _dsName;
-  bool _debug = false;
+  bool _debug = true;   // PJS
   bool _dirty = false;
   uint8_t _method;
   char* _pId;

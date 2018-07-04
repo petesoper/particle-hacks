@@ -1,6 +1,8 @@
 /*
 Copyright (c) 2013-2018 Ubidots.
 
+Some changes by Pete Soper marked with "PJS" comments
+
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
 "Software"), to deal in the Software without restriction, including
@@ -27,6 +29,9 @@ Modified and maintained by Jose Garcia for Ubidots Inc
 
 #include "Ubidots.h"
 #include "inet_hal.h"
+
+// PJS Give this limit a name so it's defined in a single place
+#define PACKET_BUFFER_SIZE 700
 
 /***************************************************************************
 CONSTRUCTOR
@@ -67,7 +72,8 @@ float Ubidots::getValue(char* id) {
   Spark.process(); // Cleans previous processes
 
   char* response = (char *) malloc(sizeof(char) * 40);
-  char* data = (char *) malloc(sizeof(char) * 700);
+  // PJS This and all other literal 700 values replaced by PACKET_BUFFER_SIZE
+  char* data = (char *) malloc(sizeof(char) * PACKET_BUFFER_SIZE);
   sprintf(data, "%s/%s|GET|%s|%s", USER_AGENT, VERSION, _token, id);
   sprintf(data, "%s|end", data);
 
@@ -153,7 +159,7 @@ float Ubidots::getValueWithDatasource(char* device, char* variable) {
 
   Spark.process(); // Cleans previous processes
 
-  char* data = (char *) malloc(sizeof(char) * 700);
+  char* data = (char *) malloc(sizeof(char) * PACKET_BUFFER_SIZE);
   char* response = (char *) malloc(sizeof(char) * 40);
   sprintf(data, "%s/%s|LV|%s|%s:%s", USER_AGENT, VERSION, _token, device, variable);
   sprintf(data, "%s|end", data);
@@ -237,7 +243,7 @@ float Ubidots::getValueWithDatasource(char* device, char* variable) {
 float Ubidots::getValueHTTP(char* id) {
 
   Spark.process(); // Cleans previous processes
-  char* response = (char *) malloc(sizeof(char) * 700);
+  char* response = (char *) malloc(sizeof(char) * PACKET_BUFFER_SIZE);
   char* data = (char *) malloc(sizeof(char) * 300);
 
   sprintf(data, "GET /api/v1.6/variables/%s", id);
@@ -332,7 +338,7 @@ char* Ubidots::getVarContext(char* id) {
   int timeout = 0;
   uint8_t max_retries = 0;
   char* data = (char *) malloc(sizeof(char) * 300);
-  char* response = (char *) malloc(sizeof(char) * 700);
+  char* response = (char *) malloc(sizeof(char) * PACKET_BUFFER_SIZE);
 
   sprintf(data, "GET /api/v1.6/variables/%s", id);
   sprintf(data, "%s/values?page_size=1 HTTP/1.1\r\n", data);
@@ -380,7 +386,7 @@ char* Ubidots::getVarContext(char* id) {
   }
 
   // Populates with null values the response array
-  for (int i = 0; i <= 700; i++){
+  for (int i = 0; i <= PACKET_BUFFER_SIZE; i++){
     response[i] = '\0';
   }
 
@@ -515,7 +521,7 @@ bool Ubidots::sendAll() {
 
 bool Ubidots::sendAll(unsigned long timestamp_global) {
   int i;
-  char* allData = (char *) malloc(sizeof(char) * 700);
+  char* allData = (char *) malloc(sizeof(char) * PACKET_BUFFER_SIZE);
   if ( timestamp_global != NULL) {
     if (_dsName == "Particle") {
       sprintf(allData, "%s/%s|POST|%s|%s@%lu%s=>", USER_AGENT, VERSION, _token, _pId, timestamp_global, "000");
