@@ -81,9 +81,10 @@ typedef struct Value {
 class Ubidots {
   public:
   explicit Ubidots(char* token, char* server = SERVER);
-  void add(char *variable_id, double value);
-  void add(char *variable_id, double value, char *ctext);
-  void add(char *variable_id, double value, char *ctext, unsigned long timestamp);
+  // PJS return true for normal completion, false if no room to add values
+  bool add(char *variable_id, double value);
+  bool add(char *variable_id, double value, char *ctext);
+  bool add(char *variable_id, double value, char *ctext, unsigned long timestamp);
   float getValue(char* id);
   float getValueWithDatasource(char* device, char* variable);
   float getValueHTTP(char* id);
