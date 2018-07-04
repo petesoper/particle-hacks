@@ -30,8 +30,23 @@ Modified and maintained by Jose Garcia for Ubidots Inc
 #include "Ubidots.h"
 #include "inet_hal.h"
 
-// PJS Give this limit a name so it's defined in a single place
+// PJS Give the send buffer limit a name so it's defined in a single place
 #define PACKET_BUFFER_SIZE 700
+
+// PJS Estimate of the send buffer "preamble" ahead of the data. Set in the
+// class constructor.
+static unsigned int packet_preamble_size;
+
+// PJS True when current add function calls will only just fit into the
+// send buffer. Set false when _currentValue reset to zero.
+
+static bool send_buffer_subscribed = false;
+
+// Current estimated send buffer content total (not including "preamble").
+// Initially set to preamble size in class constructor and reset to preamble 
+// size when _currentValue reset to zero.
+
+static unsigned int send_buffer_total_bytes;
 
 /***************************************************************************
 CONSTRUCTOR
@@ -53,6 +68,13 @@ Ubidots::Ubidots(char* token, char* server) {
   String str = System.deviceID();
   _pId = new char[str.length() + 1];
   strcpy(_pId, str.c_str());
+  // PJS Figure out a conservative estimate for the send buffer preamble:
+  // 
+  packet_preamble_size = str.length() + 1 + sizeof(token) + sizeof(USER_AGENT) +
+      9 /* timestamp */ + 9 /* "|POST"" and "=>" and the like */ + 
+      sizeof(_dsName) + (MAX_VALUES * 
+      20 /* fudge factor in lieu of prayer */ ;
+  send_buffer_total_bytes = packet_preamble_size;
 }
 
 
@@ -451,19 +473,40 @@ void Ubidots::add(char *variable_id, double value, char *ctext) {
 }
 
 
-void Ubidots::add(char *variable_id, double value, char *ctext, long unsigned timestamp_val) {
-  // PJS Move limit check ahead of copying to avoid writting past the end of
+bool Ubidots::add(char *variable_id, double value, char *ctext, long unsigned timestamp_val) {
+  // PJS Move limit check ahead of copying to avoid writing past the end of
   // val.
-  if (_currentValue >= MAX_VALUES) {
+  if (_currentValue >= MAX_VALUES || send_buffer_subscribed) {
     Serial.println(F("You are sending more than the maximum of consecutive variables"));
-    return;
+    return false;
   }
   _dirty = true;
   (val + _currentValue)->idName = variable_id;
   (val + _currentValue)->idValue = value;
   (val + _currentValue)->contextOne = ctext;
   (val + _currentValue)->timestamp_val = timestamp_val;
+
+  // PJS see if this is going to fit into the send buffer by starting with
+  // the mandatory parameter lengths
+  unsigned int temp_length = strlen(variable_id) + 26 /*worst case double*/;
+
+  // Optional parms
+  if (ctext) {
+    temp_length += strlen(ctext);
+  }
+  if (timestamp_val) {
+    temp_length += sizeof(timestamp_val);
+  }
+
+  if (packet_preamble_size + send_buffer_total_bytes  + temp_length > 
+	 PACKET_BUFFER_SIZE) {
+    // No room. Leave _currentValue alone and return false to indicate 
+    // the new stuff won't fit. Because this is expected behavior do NOT
+    // print a message.
+    return false;
+  }
   _currentValue++;
+  return true;
 }
 
 
@@ -524,6 +567,8 @@ bool Ubidots::sendAll() {
 bool Ubidots::sendAll(unsigned long timestamp_global) {
   int i;
   char* allData = (char *) malloc(sizeof(char) * PACKET_BUFFER_SIZE);
+  // PJS For the buffering estimates we've already estimated this next bit of
+  // stuff with some extra padding to be safe.
   if ( timestamp_global != NULL) {
     if (_dsName == "Particle") {
       sprintf(allData, "%s/%s|POST|%s|%s@%lu%s=>", USER_AGENT, VERSION, _token, _pId, timestamp_global, "000");
@@ -588,6 +633,9 @@ bool Ubidots::sendAllUDP(char* buffer) {
       Serial.println("ERROR, could not solve IP Address of the remote server, please check your DNS setup");
     }
     _currentValue = 0;
+    // PJS reset estimates for buffer filling
+    send_buffer_subscribed = false;
+    send_buffer_total_bytes = packet_preamble_size;
     _clientUDP.stop();
     _dirty = false;
     free(buffer);
@@ -604,6 +652,9 @@ bool Ubidots::sendAllUDP(char* buffer) {
       Serial.println("ERROR sending values with UDP");
     }
     _currentValue = 0;
+    // PJS reset estimates for buffer filling
+    send_buffer_subscribed = false;
+    send_buffer_total_bytes = packet_preamble_size;
     _clientUDP.stop();
     _dirty = false;
     free(buffer);
@@ -611,6 +662,9 @@ bool Ubidots::sendAllUDP(char* buffer) {
   }
 
   _currentValue = 0;
+  // PJS reset estimates for buffer filling
+  send_buffer_subscribed = false;
+  send_buffer_total_bytes = packet_preamble_size;
   _clientUDP.stop();
   _dirty = false;
   free(buffer);
@@ -652,12 +706,18 @@ bool Ubidots::sendAllTCP(char* buffer) {
     free(buffer);
     _dirty = false;
     _currentValue = 0;
+    // PJS reset estimates for buffer filling
+    send_buffer_subscribed = false;
+    send_buffer_total_bytes = packet_preamble_size;
     return true;
   }
 
   free(buffer);
   _dirty = false;
   _currentValue = 0;
+  // PJS reset estimates for buffer filling
+  send_buffer_subscribed = false;
+  send_buffer_total_bytes = packet_preamble_size;
   return false; // If any of the above conditions is reached, returns false to indicate an unexpected issue
 }
 
