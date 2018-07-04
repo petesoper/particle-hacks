@@ -452,16 +452,18 @@ void Ubidots::add(char *variable_id, double value, char *ctext) {
 
 
 void Ubidots::add(char *variable_id, double value, char *ctext, long unsigned timestamp_val) {
+  // PJS Move limit check ahead of copying to avoid writting past the end of
+  // val.
+  if (_currentValue >= MAX_VALUES) {
+    Serial.println(F("You are sending more than the maximum of consecutive variables"));
+    return;
+  }
   _dirty = true;
   (val + _currentValue)->idName = variable_id;
   (val + _currentValue)->idValue = value;
   (val + _currentValue)->contextOne = ctext;
   (val + _currentValue)->timestamp_val = timestamp_val;
   _currentValue++;
-  if (_currentValue > MAX_VALUES) {
-    Serial.println(F("You are sending more than the maximum of consecutive variables"));
-    _currentValue = MAX_VALUES;
-  }
 }
 
 
