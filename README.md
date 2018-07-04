@@ -1,6 +1,10 @@
-# Particle
+# Particle 
 
 Here you will learn how to send multiple values to the Ubidots API, you just need the name and the value that you want to send. In addition you are able to get the last value from a variable of your Ubidots account.
+
+## SPECIAL NOTE
+
+THIS IS A TEMPORARY CLONE WITH SOME EXPERIMENTAL CHANGES AND BUG FIXES. The official repository is [here](https://github.com/ubidots/ubidots-particle).
 
 ## Requirements
 
